@@ -10,13 +10,15 @@
 #define X	  100		// メッシュ数
 #define time  1.0		// 時間の計算範囲
 #define space 1.0		// 空間の計算範囲
-#define D	  0.4		// 拡散係数
+#define D	  0.1		// 拡散係数
 #define write 100		// 何ステップに一回書きこむか
 
 double u[N][X] = {};
 double du[N][X] = {};
 double x[X] = {};
 double S[N][X] = {};
+double mol[N] = {};
+double t;
 double dt, dx;
 double a[4] = { 0, 0.5, 0.5 ,1 };
 double b[4] = { (double)1 / 6, (double)1 / 3, (double)1 / 3, (double)1 / 6 };
@@ -28,8 +30,8 @@ char   fname[32];
 int _tmain(int argc, _TCHAR* argv[])
 {
 	// 数値安定性の計算、不安定ならエラー
-	dt = time / N;
-	dx = space / X;
+	dt = (double)time / N;
+	dx = (double)space / X;
 	valid = D * dt / (dx * dx);
 	if (valid > 0.5){
 		printf("ERROR : Calculation is unstable.(%e)\n", valid);
@@ -46,7 +48,7 @@ int _tmain(int argc, _TCHAR* argv[])
 
 	// 初期条件
 	for (i = 0; i < X; i++){
-		u[0][i] = 0;
+		u[0][i] = 1;
 	}
 
 	// Runge-Kutta法の計算
@@ -74,7 +76,7 @@ int _tmain(int argc, _TCHAR* argv[])
 		}
 		
 		// 第一種境界条件
-		u[n][0] = 1;
+		u[n][X - 1] = exp(-5 * (double)n / N);
 
 		// 4次近似の計算
 		for (k = 0; k < 4; k++){
@@ -87,13 +89,31 @@ int _tmain(int argc, _TCHAR* argv[])
 		}
 
 		// 第二種境界条件
-		u[n][X - 1] = u[n][X - 2];
+		u[n][0] = 2 * u[n][1] - u[n][2];
 		
 		// 時間発展
 		for (i = 0; i < X; i++){
 			u[n + 1][i] = u[n][i] + S[n][i];
 		}
 	}
+
+	//空間の初期化
+	for (i = 0; i < X; i++){
+		x[i] = i * dx;
+	}
+
+	// 全モル量の時間変化の計算。最後のセルはバルク相
+	sprintf(fname, "output/mol.csv");
+	fp = fopen(fname, "w");
+	fprintf(fp, "t,totalMol\n");
+	for (n = 0; n < N; n++){
+		t = (double)n * dt;
+		for (i = 0; i < X - 1; i++){
+			mol[n] += 4 * M_PI * x[i] * x[i] *  u[n][i] * dx;
+		}
+		fprintf(fp, "%e,%e\n", t, mol[n]);
+	}
+	fclose(fp);
 
 	// 計算終了の確認
 	printf("Calculation is complete. Please push enter key.");
